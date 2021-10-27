@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  backend:
+    build:
+      context: .
+    image: backend-image
+    container_name: backend
+    hostname: backend
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8080"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - db
+      - rabbit
+
+  rabbit:
+    image: rabbitmq:3-management
+    container_name: rabbit
+    hostname: rabbit
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    ports:
+      - "5682:5672"
+      - "15682:15672"
+
+  worker:
+    image: backend-image
+    restart: on-failure
+    command: >
+      sh -c "celery worker -B -l info -A the_eye.celery -s /tmp/celerybeat-schedule"
+    depends_on:
+      - backend
+      - rabbit
+      - db
+
+  db:
+    image: postgres:10-alpine
+    container_name: db
+    hostname: db_host
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "54320:5432"
+
